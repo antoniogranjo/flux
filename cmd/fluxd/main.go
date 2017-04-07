@@ -14,10 +14,12 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/1.5/rest"
 
-	"github.com/weaveworks/flux"
-	transport "github.com/weaveworks/flux/http"
+	//	"github.com/weaveworks/flux"
+	"github.com/weaveworks/flux/git"
+	daemonhttp "github.com/weaveworks/flux/http/daemon"
 	"github.com/weaveworks/flux/platform"
 	"github.com/weaveworks/flux/platform/kubernetes"
+	"github.com/weaveworks/flux/registry"
 )
 
 var version string
@@ -34,9 +36,9 @@ func main() {
 	}
 	// This mirrors how kubectl extracts information from the environment.
 	var (
-		listenAddr        = fs.StringP("listen", "l", ":3031", "Listen address where /metrics will be served")
-		fluxsvcAddress    = fs.String("fluxsvc-address", "wss://cloud.weave.works/api/flux", "Address of the fluxsvc to connect to.")
-		token             = fs.String("token", "", "Token to use to authenticate with flux service")
+		listenAddr = fs.StringP("listen", "l", ":3031", "Listen address where /metrics will be served")
+		//		fluxsvcAddress    = fs.String("fluxsvc-address", "wss://cloud.weave.works/api/flux", "Address of the fluxsvc to connect to.")
+		//		token             = fs.String("token", "", "Token to use to authenticate with flux service")
 		kubernetesKubectl = fs.String("kubernetes-kubectl", "", "Optional, explicit path to kubectl tool")
 		versionFlag       = fs.Bool("version", false, "Get version number")
 		// Git repo & key
@@ -132,9 +134,9 @@ func main() {
 
 		creds, err := registry.CredentialsFromFile(*dockerCredFile)
 		if err != nil {
-			logger.Log("err", errors.Wrap(err, "decoding registry credentials"))
+			logger.Log("err", err)
 		}
-		registryLogger := log.NewContext(instanceLogger).With("component", "registry")
+		registryLogger := log.NewContext(logger).With("component", "registry")
 		reg := registry.NewRegistry(
 			registry.NewRemoteClientFactory(creds, registryLogger, memcacheClient, *registryCacheExpiry),
 			registryLogger,
@@ -142,29 +144,39 @@ func main() {
 		reg = registry.NewInstrumentedRegistry(reg)
 	}
 
-	pform := platform.Daemon{
+	var repo git.Repo
+	{
+		repo = git.Repo{
+			URL:    *gitURL,
+			Path:   *gitPath,
+			Branch: *gitBranch,
+			Key:    *gitKey, // FIXME
+		}
+	}
+
+	daemon := &platform.Daemon{
 		V:        version,
 		Cluster:  k8s,
 		Repo:     repo,
 		Registry: reg,
 	}
 
-	// Connect to fluxsvc
-	daemonLogger := log.NewContext(logger).With("component", "client")
-	daemon, err := transport.NewDaemon(
-		&http.Client{Timeout: 10 * time.Second},
-		fmt.Sprintf("fluxd/%v", version),
-		flux.Token(*token),
-		transport.NewRouter(),
-		*fluxsvcAddress,
-		pform,
-		daemonLogger,
-	)
-	if err != nil {
-		logger.Log("err", err)
-		os.Exit(1)
-	}
-	defer daemon.Close()
+	// // Connect to fluxsvc
+	// daemonLogger := log.NewContext(logger).With("component", "client")
+	// daemon, err := transport.NewUpstream(
+	// 	&http.Client{Timeout: 10 * time.Second},
+	// 	fmt.Sprintf("fluxd/%v", version),
+	// 	flux.Token(*token),
+	// 	transport.NewRouter(),
+	// 	*fluxsvcAddress,
+	// 	pform,
+	// 	daemonLogger,
+	// )
+	// if err != nil {
+	// 	logger.Log("err", err)
+	// 	os.Exit(1)
+	// }
+	// defer daemon.Close()
 
 	// Mechanical components.
 	errc := make(chan error)
@@ -176,9 +188,11 @@ func main() {
 
 	// HTTP transport component, for metrics
 	go func() {
-		logger.Log("addr", *listenAddr)
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
+		handler := daemonhttp.NewHandler(daemon, daemonhttp.NewRouter())
+		mux.Handle("/api/flux/", http.StripPrefix("/api/flux", handler))
+		logger.Log("addr", *listenAddr)
 		errc <- http.ListenAndServe(*listenAddr, mux)
 	}()
 

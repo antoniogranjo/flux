@@ -19,11 +19,14 @@ type Daemon struct {
 	Repo     git.Repo
 }
 
+// %%% FIXME %%% do we need these other than for the UI? People will
+// already have tools for listing stuff, e.g., kubectl.
 type DaemonV6 interface {
 	Version() (string, error)
 	ListServices(namespace string) ([]flux.ServiceStatus, error)
 	ListImages(flux.ServiceSpec) ([]flux.ImageStatus, error)
 	UpdateImages(flux.ReleaseSpec) error
+	SyncCluster() error
 	SyncStatus(string) ([]string, error)
 	DumpConfig() ([]byte, error)
 }
@@ -53,6 +56,9 @@ func (d *Daemon) DumpConfig() ([]byte, error) {
 func (d *Daemon) ListServices(namespace string) ([]flux.ServiceStatus, error) {
 	var res []flux.ServiceStatus
 	services, err := d.getAllServices(namespace)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting services from cluster")
+	}
 	for _, service := range services {
 		res = append(res, flux.ServiceStatus{
 			ID:         service.ID,
@@ -96,6 +102,12 @@ func (d *Daemon) ListImages(spec flux.ServiceSpec) ([]flux.ImageStatus, error) {
 
 // Apply the desired changes to the config files
 func (d *Daemon) UpdateImages(flux.ReleaseSpec) error {
+	return errors.New("FIXME")
+}
+
+// Tell the daemon to synchronise the cluster with the manifests in
+// the git repo.
+func (d *Daemon) SyncCluster() error {
 	return errors.New("FIXME")
 }
 

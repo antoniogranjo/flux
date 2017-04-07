@@ -27,18 +27,10 @@ type PlatformV5 interface {
 	Sync(SyncDef) error
 }
 
-type PlatformV6 interface {
-	PlatformV5
-	// From v6, we mirror the daemon API here, since in general we're
-	// forwarding requests to it, rather than asking for specific data
-	// then assembling it into answers.
-	DaemonV6
-}
-
 // Platform is the SPI for the daemon; i.e., it's all the things we
-// have to refer to the daemon, rather than from the service.
+// have to ask to the daemon, rather than the service.
 type Platform interface {
-	PlatformV6
+	PlatformV5
 }
 
 // Wrap errors in this to indicate that the platform should be

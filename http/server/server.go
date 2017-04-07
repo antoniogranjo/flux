@@ -70,10 +70,10 @@ func (s HTTPService) ListServices(w http.ResponseWriter, r *http.Request) {
 	namespace := mux.Vars(r)["namespace"]
 	res, err := s.service.ListServices(inst, namespace)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
-	jsonResponse(w, r, res)
+	transport.JSONResponse(w, r, res)
 }
 
 func (s HTTPService) ListImages(w http.ResponseWriter, r *http.Request) {
@@ -87,11 +87,11 @@ func (s HTTPService) ListImages(w http.ResponseWriter, r *http.Request) {
 
 	d, err := s.service.ListImages(inst, spec)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, d)
+	transport.JSONResponse(w, r, d)
 }
 
 func (s HTTPService) PostRelease(w http.ResponseWriter, r *http.Request) {
@@ -148,11 +148,11 @@ func (s HTTPService) PostRelease(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, transport.PostReleaseResponse{
+	transport.JSONResponse(w, r, transport.PostReleaseResponse{
 		Status:    "Queued.",
 		ReleaseID: id,
 	})
@@ -163,11 +163,11 @@ func (s HTTPService) GetRelease(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	job, err := s.service.GetRelease(inst, jobs.JobID(id))
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, job)
+	transport.JSONResponse(w, r, job)
 }
 
 func (s HTTPService) Automate(w http.ResponseWriter, r *http.Request) {
@@ -180,7 +180,7 @@ func (s HTTPService) Automate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.service.Automate(inst, id); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (s HTTPService) Deautomate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.service.Deautomate(inst, id); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -214,7 +214,7 @@ func (s HTTPService) Lock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.service.Lock(inst, id); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -231,7 +231,7 @@ func (s HTTPService) Unlock(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.service.Unlock(inst, id); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -251,21 +251,21 @@ func (s HTTPService) History(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("before") != "" {
 		before, err = time.Parse(time.RFC3339Nano, r.FormValue("before"))
 		if err != nil {
-			errorResponse(w, r, err)
+			transport.ErrorResponse(w, r, err)
 			return
 		}
 	}
 	limit := int64(-1)
 	if r.FormValue("limit") != "" {
 		if _, err := fmt.Sscan(r.FormValue("limit"), &limit); err != nil {
-			errorResponse(w, r, err)
+			transport.ErrorResponse(w, r, err)
 			return
 		}
 	}
 
 	h, err := s.service.History(inst, spec, before, limit)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -276,18 +276,18 @@ func (s HTTPService) History(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonResponse(w, r, h)
+	transport.JSONResponse(w, r, h)
 }
 
 func (s HTTPService) GetConfig(w http.ResponseWriter, r *http.Request) {
 	inst := getInstanceID(r)
 	config, err := s.service.GetConfig(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, config)
+	transport.JSONResponse(w, r, config)
 }
 
 func (s HTTPService) SetConfig(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +300,7 @@ func (s HTTPService) SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.service.SetConfig(inst, config); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -317,7 +317,7 @@ func (s HTTPService) PatchConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.service.PatchConfig(inst, patch); err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -328,7 +328,7 @@ func (s HTTPService) GenerateKeys(w http.ResponseWriter, r *http.Request) {
 	inst := getInstanceID(r)
 	err := s.service.GenerateDeployKey(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
@@ -352,14 +352,14 @@ func (s HTTPService) PostIntegrationsGithub(w http.ResponseWriter, r *http.Reque
 	// Generate deploy key
 	err := s.service.GenerateDeployKey(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
 	// Obtain the generated key
 	cfg, err := s.service.GetConfig(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 	publicKey := cfg.Git.HideKey().Key
@@ -387,11 +387,11 @@ func (s HTTPService) Status(w http.ResponseWriter, r *http.Request) {
 	inst := getInstanceID(r)
 	status, err := s.service.Status(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, status)
+	transport.JSONResponse(w, r, status)
 }
 
 func (s HTTPService) RegisterV4(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +454,7 @@ func (s HTTPService) IsConnected(w http.ResponseWriter, r *http.Request) {
 		// NB this has a specific contract for "cannot contact" -> // "404 not found"
 		transport.WriteError(w, r, http.StatusNotFound, err)
 	default:
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 	}
 }
 
@@ -462,11 +462,11 @@ func (s HTTPService) Export(w http.ResponseWriter, r *http.Request) {
 	inst := getInstanceID(r)
 	status, err := s.service.Export(inst)
 	if err != nil {
-		errorResponse(w, r, err)
+		transport.ErrorResponse(w, r, err)
 		return
 	}
 
-	jsonResponse(w, r, status)
+	transport.JSONResponse(w, r, status)
 }
 
 // --- end handlers
@@ -497,40 +497,6 @@ func getInstanceID(req *http.Request) flux.InstanceID {
 		return flux.DefaultInstanceID
 	}
 	return flux.InstanceID(s)
-}
-
-func jsonResponse(w http.ResponseWriter, r *http.Request, result interface{}) {
-	body, err := json.Marshal(result)
-	if err != nil {
-		errorResponse(w, r, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
-}
-
-func errorResponse(w http.ResponseWriter, r *http.Request, apiError error) {
-	var outErr *flux.BaseError
-	var code int
-	err := errors.Cause(apiError)
-	switch err := err.(type) {
-	case flux.Missing:
-		code = http.StatusNotFound
-		outErr = err.BaseError
-	case flux.UserConfigProblem:
-		code = http.StatusUnprocessableEntity
-		outErr = err.BaseError
-	case flux.ServerException:
-		code = http.StatusInternalServerError
-		outErr = err.BaseError
-	default:
-		code = http.StatusInternalServerError
-		outErr = flux.CoverAllError(apiError)
-	}
-
-	transport.WriteError(w, r, code, outErr)
 }
 
 // codeWriter intercepts the HTTP status code. WriteHeader may not be called in
