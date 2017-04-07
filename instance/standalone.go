@@ -15,9 +15,7 @@ import (
 type StandaloneInstancer struct {
 	Instance    flux.InstanceID
 	Connecter   platform.Connecter
-	Registry    registry.Registry
 	Config      Configurer
-	GitRepo     git.Repo
 	EventReader history.EventReader
 	EventWriter history.EventWriter
 	BaseLogger  log.Logger
@@ -35,7 +33,6 @@ func (s StandaloneInstancer) Get(inst flux.InstanceID) (*Instance, error) {
 		platform,
 		s.Registry,
 		s.Config,
-		s.GitRepo,
 		log.NewContext(s.BaseLogger).With("instanceID", s.Instance),
 		s.EventReader,
 		s.EventWriter,

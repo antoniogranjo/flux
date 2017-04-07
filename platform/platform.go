@@ -27,10 +27,18 @@ type PlatformV5 interface {
 	Sync(SyncDef) error
 }
 
-// Platform is the interface various platforms fulfill, e.g.
-// *kubernetes.Cluster
-type Platform interface {
+type PlatformV6 interface {
 	PlatformV5
+	// From v6, we mirror the daemon API here, since in general we're
+	// forwarding requests to it, rather than asking for specific data
+	// then assembling it into answers.
+	DaemonV6
+}
+
+// Platform is the SPI for the daemon; i.e., it's all the things we
+// have to refer to the daemon, rather than from the service.
+type Platform interface {
+	PlatformV6
 }
 
 // Wrap errors in this to indicate that the platform should be

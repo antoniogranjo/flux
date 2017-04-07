@@ -74,10 +74,6 @@ type ReleaseSpec struct {
 	ImageSpec    ImageSpec
 	Kind         ReleaseKind
 	Excludes     []ServiceID
-
-	// Backwards Compatibility, remove once no more jobs
-	// TODO: Remove this once there are no more jobs with ServiceSpec, only ServiceSpecs
-	ServiceSpec ServiceSpec
 }
 
 // ReleaseType gives a one-word description of the release, mainly
