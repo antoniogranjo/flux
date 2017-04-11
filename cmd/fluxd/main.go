@@ -150,7 +150,7 @@ func main() {
 			URL:    *gitURL,
 			Path:   *gitPath,
 			Branch: *gitBranch,
-			Key:    *gitKey, // FIXME
+			Key:    *gitKey, // FIXME this should be treated as a path now
 		}
 	}
 
