@@ -158,9 +158,8 @@ func (c *Cluster) SomeServices(ids []flux.ServiceID) (res []platform.Service, er
 }
 
 // AllServices returns all services matching the criteria; that is, in
-// the namespace (or any namespace if that argument is empty), and not
-// in the `ignore` set given.
-func (c *Cluster) AllServices(namespace string, ignore flux.ServiceIDSet) (res []platform.Service, err error) {
+// the namespace (or any namespace if that argument is empty)
+func (c *Cluster) AllServices(namespace string) (res []platform.Service, err error) {
 	namespaces := []string{}
 	if namespace == "" {
 		list, err := c.client.Namespaces().List(api.ListOptions{})
@@ -189,9 +188,7 @@ func (c *Cluster) AllServices(namespace string, ignore flux.ServiceIDSet) (res [
 			if isAddon(&service) {
 				continue
 			}
-			if !ignore.Contains(flux.MakeServiceID(ns, service.Name)) {
-				res = append(res, c.makeService(ns, &service, controllers))
-			}
+			res = append(res, c.makeService(ns, &service, controllers))
 		}
 	}
 	return res, nil
@@ -461,6 +458,10 @@ func appendYAML(buffer *bytes.Buffer, apiVersion, kind string, object interface{
 	buffer.WriteString("\n")
 	buffer.Write(yamlBytes)
 	return nil
+}
+
+func (c *Cluster) UpdateDefinition(def []byte, image flux.ImageID) ([]byte, error) {
+	return updatePodController(def, image)
 }
 
 // --- end platform.Cluster

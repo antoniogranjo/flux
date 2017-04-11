@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -19,43 +20,24 @@ type Daemon struct {
 	Repo     git.Repo
 }
 
-// %%% FIXME %%% do we need these other than for the UI? People will
-// already have tools for listing stuff, e.g., kubectl.
-type DaemonV6 interface {
-	Version() (string, error)
-	ListServices(namespace string) ([]flux.ServiceStatus, error)
-	ListImages(flux.ServiceSpec) ([]flux.ImageStatus, error)
-	UpdateImages(flux.ReleaseSpec) error
-	SyncCluster() error
-	SyncStatus(string) ([]string, error)
-	DumpConfig() ([]byte, error)
-}
-
-// Invariant
-var _ DaemonV6 = &Daemon{}
-
-// The things we can get from the running cluster. These used to form
-// the Platform interface; but now we do more in the daemon so they
-// are distinct interfaces.
-type Cluster interface {
-	AllServices(maybeNamespace string, ignored flux.ServiceIDSet) ([]Service, error)
-	SomeServices([]flux.ServiceID) ([]Service, error)
-	Ping() error
-	Export() ([]byte, error)
-	Sync(SyncDef) error
-}
+// Invariant.
+var _ Platform = &Daemon{}
 
 func (d *Daemon) Version() (string, error) {
 	return d.V, nil
 }
 
-func (d *Daemon) DumpConfig() ([]byte, error) {
+func (d *Daemon) Ping() error {
+	return d.Cluster.Ping()
+}
+
+func (d *Daemon) Export() ([]byte, error) {
 	return d.Cluster.Export()
 }
 
 func (d *Daemon) ListServices(namespace string) ([]flux.ServiceStatus, error) {
 	var res []flux.ServiceStatus
-	services, err := d.getAllServices(namespace)
+	services, err := d.Cluster.AllServices(namespace)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting services from cluster")
 	}
@@ -74,16 +56,16 @@ func (d *Daemon) ListImages(spec flux.ServiceSpec) ([]flux.ImageStatus, error) {
 	var services []Service
 	var err error
 	if spec == flux.ServiceSpecAll {
-		services, err = d.getAllServices("")
+		services, err = d.Cluster.AllServices("")
 	} else {
 		id, err := spec.AsID()
 		if err != nil {
 			return nil, errors.Wrap(err, "treating service spec as ID")
 		}
-		services, err = d.getServices([]flux.ServiceID{id})
+		services, err = d.Cluster.SomeServices([]flux.ServiceID{id})
 	}
 
-	images, err := d.collectAvailableImages(services)
+	images, err := CollectAvailableImages(d.Registry, services)
 	if err != nil {
 		return nil, errors.Wrap(err, "getting images for services")
 	}
@@ -101,8 +83,8 @@ func (d *Daemon) ListImages(spec flux.ServiceSpec) ([]flux.ImageStatus, error) {
 }
 
 // Apply the desired changes to the config files
-func (d *Daemon) UpdateImages(flux.ReleaseSpec) error {
-	return errors.New("FIXME")
+func (d *Daemon) UpdateImages(flux.ReleaseSpec) (flux.ReleaseResult, error) {
+	return nil, errors.New("FIXME")
 }
 
 // Tell the daemon to synchronise the cluster with the manifests in
@@ -120,26 +102,14 @@ func (d *Daemon) SyncStatus(commitRef string) ([]string, error) {
 	return nil, errors.New("FIXME")
 }
 
-//
+// Non-platform.Platform methods
+
+func (d *Daemon) LogEvent(ev flux.Event) error {
+	// FIXME FIX FIXMEEEEEEE
+	return nil
+}
 
 // vvv helpers vvv
-
-// Get the services in `namespace` along with their containers (if
-// there are any) from the platform; if namespace is blank, just get
-// all the services, in any namespace.
-func (d *Daemon) getAllServices(maybeNamespace string) ([]Service, error) {
-	return d.getAllServicesExcept(maybeNamespace, flux.ServiceIDSet{})
-}
-
-// Get all services except those with an ID in the set given
-func (d *Daemon) getAllServicesExcept(maybeNamespace string, ignored flux.ServiceIDSet) (res []Service, err error) {
-	return d.Cluster.AllServices(maybeNamespace, ignored)
-}
-
-// Get the services mentioned, along with their containers.
-func (d *Daemon) getServices(ids []flux.ServiceID) ([]Service, error) {
-	return d.Cluster.SomeServices(ids)
-}
 
 func containers2containers(cs []Container) []flux.Container {
 	res := make([]flux.Container, len(cs))
@@ -158,10 +128,43 @@ func containers2containers(cs []Container) []flux.Container {
 // For keeping track of which images are available
 type ImageMap map[string][]flux.ImageDescription
 
+// Create a map of images. It will check that each image exists.
+func ExactImages(reg registry.Registry, images []flux.ImageID) (ImageMap, error) {
+	m := ImageMap{}
+	for _, id := range images {
+		// We must check that the exact images requested actually exist. Otherwise we risk pushing invalid images to git.
+		exist, err := imageExists(reg, id)
+		if err != nil {
+			return m, errors.Wrap(flux.ErrInvalidImageID, err.Error())
+		}
+		if !exist {
+			return m, errors.Wrap(flux.ErrInvalidImageID, fmt.Sprintf("image %q does not exist", id))
+		}
+		m[id.Repository()] = []flux.ImageDescription{flux.ImageDescription{ID: id}}
+	}
+	return m, nil
+}
+
+// Checks whether the given image exists in the repository.
+// Return true if exist, false otherwise
+func imageExists(reg registry.Registry, imageID flux.ImageID) (bool, error) {
+	// Use this method to parse the image, because it is safe. I.e. it will error and inform the user if it is malformed.
+	img, err := flux.ParseImage(imageID.String(), nil)
+	if err != nil {
+		return false, err
+	}
+	// Get a specific image.
+	_, err = reg.GetImage(registry.RepositoryFromImage(img), img.Tag)
+	if err != nil {
+		return false, nil
+	}
+	return true, nil
+}
+
 // Get the images available for the services given. An image may be
 // mentioned more than once in the services, but will only be fetched
 // once.
-func (d *Daemon) collectAvailableImages(services []Service) (ImageMap, error) {
+func CollectAvailableImages(reg registry.Registry, services []Service) (ImageMap, error) {
 	images := ImageMap{}
 	for _, service := range services {
 		for _, container := range service.ContainersOrNil() {
@@ -178,7 +181,7 @@ func (d *Daemon) collectAvailableImages(services []Service) (ImageMap, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing repository %s", repo)
 		}
-		imageRepo, err := d.Registry.GetRepository(r)
+		imageRepo, err := reg.GetRepository(r)
 		if err != nil {
 			return nil, errors.Wrapf(err, "fetching image metadata for %s", repo)
 		}
@@ -204,7 +207,7 @@ func (d *Daemon) collectAvailableImages(services []Service) (ImageMap, error) {
 // available images are in descending order of latestness.) If no such
 // image exists, returns nil, and the caller can decide whether that's
 // an error or not.
-func (m ImageMap) latestImage(repo string) *flux.ImageDescription {
+func (m ImageMap) LatestImage(repo string) *flux.ImageDescription {
 	for _, image := range m[repo] {
 		_, _, tag := image.ID.Components()
 		if strings.EqualFold(tag, "latest") {

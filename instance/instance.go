@@ -1,19 +1,11 @@
 package instance
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 
 	"github.com/weaveworks/flux"
-	"github.com/weaveworks/flux/git"
 	"github.com/weaveworks/flux/history"
-	fluxmetrics "github.com/weaveworks/flux/metrics"
 	"github.com/weaveworks/flux/platform"
-	"github.com/weaveworks/flux/registry"
 )
 
 type Instancer interface {
@@ -23,7 +15,6 @@ type Instancer interface {
 type Instance struct {
 	Platform platform.Platform
 	Config   Configurer
-	Repo     git.Repo
 
 	log.Logger
 	history.EventReader

@@ -108,10 +108,10 @@ func main() {
 			os.Exit(1)
 		}
 
-		if services, err := cluster.AllServices("", nil); err != nil {
-			logger.Log("services", err)
+		if err := cluster.Ping(); err != nil {
+			logger.Log("ping", err)
 		} else {
-			logger.Log("services", len(services))
+			logger.Log("ping", true)
 		}
 
 		k8s = cluster
