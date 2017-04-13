@@ -44,7 +44,7 @@ func (s *StandaloneMessageBus) Connect(inst flux.InstanceID) (Platform, error) {
 // trying to use it is the only way to tell if it's closed -- the
 // error representing the cause will be sent to the channel supplied.
 func (s *StandaloneMessageBus) Subscribe(inst flux.InstanceID, p Platform, complete chan<- error) {
-	s.Lock()
+	s.RWMutex.Lock()
 	// We're replacing another client
 	if existing, ok := s.connected[inst]; ok {
 		delete(s.connected, inst)
@@ -57,18 +57,18 @@ func (s *StandaloneMessageBus) Subscribe(inst flux.InstanceID, p Platform, compl
 		remote: p,
 		done:   done,
 	}
-	s.Unlock()
+	s.RWMutex.Unlock()
 
 	// The only way we detect remote platforms closing are if an RPC
 	// is attempted and it fails. When that happens, clean up behind
 	// us.
 	go func() {
 		err := <-done
-		s.Lock()
+		s.RWMutex.Lock()
 		if existing, ok := s.connected[inst]; ok && existing.remote == p {
 			delete(s.connected, inst)
 		}
-		s.Unlock()
+		s.RWMutex.Unlock()
 		complete <- err
 	}()
 }
@@ -114,8 +114,8 @@ type removeablePlatform struct {
 }
 
 func (p *removeablePlatform) closeWithError(err error) {
-	p.Lock()
-	defer p.Unlock()
+	p.Mutex.Lock()
+	defer p.Mutex.Unlock()
 	if p.done != nil {
 		p.done <- err
 		close(p.done)
@@ -195,6 +195,42 @@ func (p *removeablePlatform) SyncStatus(cursor string) (_ []string, err error) {
 	return p.remote.SyncStatus(cursor)
 }
 
+func (p *removeablePlatform) Automate(s flux.ServiceID) (err error) {
+	defer func() {
+		if _, ok := err.(FatalError); ok {
+			p.closeWithError(err)
+		}
+	}()
+	return p.remote.Automate(s)
+}
+
+func (p *removeablePlatform) Deautomate(s flux.ServiceID) (err error) {
+	defer func() {
+		if _, ok := err.(FatalError); ok {
+			p.closeWithError(err)
+		}
+	}()
+	return p.remote.Deautomate(s)
+}
+
+func (p *removeablePlatform) Lock(s flux.ServiceID) (err error) {
+	defer func() {
+		if _, ok := err.(FatalError); ok {
+			p.closeWithError(err)
+		}
+	}()
+	return p.remote.Lock(s)
+}
+
+func (p *removeablePlatform) Unlock(s flux.ServiceID) (err error) {
+	defer func() {
+		if _, ok := err.(FatalError); ok {
+			p.closeWithError(err)
+		}
+	}()
+	return p.remote.Unlock(s)
+}
+
 // disconnectedPlatform is a stub implementation used when the
 // platform is known to be missing.
 
@@ -230,4 +266,20 @@ func (p disconnectedPlatform) SyncCluster() error {
 
 func (p disconnectedPlatform) SyncStatus(string) ([]string, error) {
 	return nil, errNotSubscribed
+}
+
+func (d disconnectedPlatform) Automate(flux.ServiceID) error {
+	return errNotSubscribed
+}
+
+func (d disconnectedPlatform) Deautomate(flux.ServiceID) error {
+	return errNotSubscribed
+}
+
+func (d disconnectedPlatform) Lock(flux.ServiceID) error {
+	return errNotSubscribed
+}
+
+func (d disconnectedPlatform) Unlock(flux.ServiceID) error {
+	return errNotSubscribed
 }

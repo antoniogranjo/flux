@@ -110,6 +110,46 @@ func (i *instrumentedPlatform) SyncStatus(cursor string) (_ []string, err error)
 	return i.p.SyncStatus(cursor)
 }
 
+func (i *instrumentedPlatform) Automate(s flux.ServiceID) (err error) {
+	defer func(begin time.Time) {
+		requestDuration.With(
+			fluxmetrics.LabelMethod, "Automate",
+			fluxmetrics.LabelSuccess, fmt.Sprint(err == nil),
+		).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+	return i.p.Automate(s)
+}
+
+func (i *instrumentedPlatform) Deautomate(s flux.ServiceID) (err error) {
+	defer func(begin time.Time) {
+		requestDuration.With(
+			fluxmetrics.LabelMethod, "Deautomate",
+			fluxmetrics.LabelSuccess, fmt.Sprint(err == nil),
+		).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+	return i.p.Deautomate(s)
+}
+
+func (i *instrumentedPlatform) Lock(s flux.ServiceID) (err error) {
+	defer func(begin time.Time) {
+		requestDuration.With(
+			fluxmetrics.LabelMethod, "Lock",
+			fluxmetrics.LabelSuccess, fmt.Sprint(err == nil),
+		).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+	return i.p.Lock(s)
+}
+
+func (i *instrumentedPlatform) Unlock(s flux.ServiceID) (err error) {
+	defer func(begin time.Time) {
+		requestDuration.With(
+			fluxmetrics.LabelMethod, "Unlock",
+			fluxmetrics.LabelSuccess, fmt.Sprint(err == nil),
+		).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+	return i.p.Unlock(s)
+}
+
 // BusMetrics has metrics for messages buses.
 type BusMetrics struct {
 	KickCount metrics.Counter

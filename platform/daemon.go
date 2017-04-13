@@ -102,11 +102,40 @@ func (d *Daemon) SyncStatus(commitRef string) ([]string, error) {
 	return nil, errors.New("FIXME")
 }
 
+func (d *Daemon) Automate(s flux.ServiceID) error {
+	return d.applyPolicy(flux.PolicyAutomated, s)
+}
+
+func (d *Daemon) Deautomate(s flux.ServiceID) error {
+	return d.removePolicy(flux.PolicyAutomated, s)
+}
+
+func (d *Daemon) Lock(s flux.ServiceID) error {
+	return d.applyPolicy(flux.PolicyLocked, s)
+}
+
+func (d *Daemon) Unlock(s flux.ServiceID) error {
+	return d.removePolicy(flux.PolicyLocked, s)
+}
+
 // Non-platform.Platform methods
 
 func (d *Daemon) LogEvent(ev flux.Event) error {
 	// FIXME FIX FIXMEEEEEEE
 	return nil
+}
+
+func (d *Daemon) applyPolicy(policy flux.Policy, s flux.ServiceID) error {
+	// Clone repo
+	// Find the service
+	// Apply the policy if it isn't already
+	//   - This is k8s specific
+	// Commit & Push
+	return errors.New("FIXME")
+}
+
+func (d *Daemon) removePolicy(policy flux.Policy, s flux.ServiceID) error {
+	return errors.New("FIXME")
 }
 
 // vvv helpers vvv

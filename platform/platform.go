@@ -43,6 +43,10 @@ type PlatformV6 interface {
 	UpdateImages(flux.ReleaseSpec) (flux.ReleaseResult, error)
 	SyncCluster() error
 	SyncStatus(string) ([]string, error)
+	Automate(flux.ServiceID) error
+	Deautomate(flux.ServiceID) error
+	Lock(flux.ServiceID) error
+	Unlock(flux.ServiceID) error
 }
 
 // Platform is the SPI for the daemon; i.e., it's all the things we
